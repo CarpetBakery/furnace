@@ -1005,7 +1005,7 @@ const FurnaceGUIColorDef guiColors[GUI_COLOR_MAX]={
   D(GUI_COLOR_ORDER_SELECTED,"",ImVec4(0.6f,0.8f,1.0f,0.75f)),
   D(GUI_COLOR_ORDER_SIMILAR,"",ImVec4(0.5f,1.0f,1.0f,1.0f)),
   D(GUI_COLOR_ORDER_INACTIVE,"",ImVec4(1.0f,1.0f,1.0f,1.0f)),
-  D(GUI_COLOR_ORDER_UNIQUE,"",ImVec4(1.0f,0.94f,0.0f,1.0f)),
+  D(GUI_COLOR_ORDER_UNIQUE,"",ImVec4(1.0f,0.87f,0.0f,1.0f)),
 
   D(GUI_COLOR_FM_ALG_BG,"",ImVec4(0.12f,0.12f,0.12f,1.0f)),
   D(GUI_COLOR_FM_ALG_LINE,"",ImVec4(1.0f,1.0f,1.0f,0.33f)),
