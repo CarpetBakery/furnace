@@ -726,6 +726,8 @@ const FurnaceGUIActionDef guiActions[GUI_ACTION_MAX]={
   D("PAT_SELECTION_END", _N("Expand selection to end of pattern"), 0),
   D("PAT_SELECTION_UP_COARSE", _N("Expand selection upwards (coarse)"), FURKMOD_SHIFT|SDLK_PAGEUP),
   D("PAT_SELECTION_DOWN_COARSE", _N("Expand selection downwards (coarse)"), FURKMOD_SHIFT|SDLK_PAGEDOWN),
+  D("PAT_SELECTION_LEFT_COARSE", _N("Expand selection left (coarse)"), FURKMOD_SHIFT|FURKMOD_CTRL|SDLK_LEFT),
+  D("PAT_SELECTION_RIGHT_COARSE", _N("Expand selection right (coarse)"), FURKMOD_SHIFT|FURKMOD_CTRL|SDLK_RIGHT),
   D("PAT_MOVE_UP", _N("Move selection up"), FURKMOD_ALT|SDLK_UP),
   D("PAT_MOVE_DOWN", _N("Move selection down"), FURKMOD_ALT|SDLK_DOWN),
   D("PAT_MOVE_LEFT_CHANNEL", _N("Move selection to previous channel"), FURKMOD_ALT|SDLK_LEFT),

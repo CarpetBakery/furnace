@@ -618,6 +618,22 @@ void FurnaceGUI::doAction(int what) {
     case GUI_ACTION_PAT_SELECTION_DOWN_COARSE:
       moveCursor(0,editStepCoarse,true);
       break;
+    case GUI_ACTION_PAT_SELECTION_LEFT_COARSE: {
+      int finePrev = cursor.xFine == 0 ? 1 : cursor.xFine;
+      moveCursor(-finePrev, 0, true);
+    }
+      break;
+    case GUI_ACTION_PAT_SELECTION_RIGHT_COARSE: {
+      //int channelSize = (e->curSubSong->chanCollapse[cursor.xCoarse] ? (4 - e->curSubSong->chanCollapse[cursor.xCoarse]) : (3 + e->curPat[cursor.xCoarse].effectCols * 2))-1;
+      //int steps = (channelSize)-cursor.xFine;
+      //steps = steps == 0 ? 1 : steps;
+
+      int channelSize = (e->curSubSong->chanCollapse[cursor.xCoarse] ? (4 - e->curSubSong->chanCollapse[cursor.xCoarse]) : (3 + e->curPat[cursor.xCoarse].effectCols * 2));
+      int steps = (channelSize)-cursor.xFine;
+      steps = steps == 0 ? 1 : steps;
+      moveCursor(steps, 0, true);
+    }
+      break;
     case GUI_ACTION_PAT_MOVE_UP:
       moveSelected(0,-1);
       break;
