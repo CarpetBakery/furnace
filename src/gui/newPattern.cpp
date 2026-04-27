@@ -1410,7 +1410,16 @@ void FurnaceGUI::drawPatternNew() {
       // test for selection
       if (hovered) {
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-          startSelection(pointer.xCoarse,pointer.xFine,pointer.y,pointer.order);
+          // instantly draw selection box if holding shift when left clicking
+          if (ImGui::IsKeyDown(ImGuiKey_LeftShift) || ImGui::IsKeyDown(ImGuiKey_RightShift)) {
+            if ((pointer.xCoarse < selStart.xCoarse) || (pointer.xCoarse == selStart.xCoarse && pointer.xFine < selStart.xFine)) {
+              startSelection(selEnd.xCoarse,selEnd.xFine,selEnd.y,selEnd.order);
+            }else {
+              startSelection(selStart.xCoarse,selStart.xFine,selStart.y,selStart.order);
+            }
+          } else {
+            startSelection(pointer.xCoarse,pointer.xFine,pointer.y,pointer.order);
+          }
         }
 
         updateSelection(pointer.xCoarse,pointer.xFine,pointer.y,pointer.order);
