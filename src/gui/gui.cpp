@@ -3927,6 +3927,16 @@ int FurnaceGUI::processEvent(SDL_Event* ev) {
       }
     }
   } else if (ev->type==SDL_KEYUP) {
+    // Hack to make transposed note preview stop playing
+    if (!e->transposeNotesOn.empty()) {
+      e->synchronized([this]() {
+        for (int note : e->transposeNotesOn) {
+          e->autoNoteOff(-1, note);
+        }
+        e->transposeNotesOn.clear();
+      });
+    }
+
     stopPreviewNote(ev->key.keysym.scancode,true);
     if (wavePreviewOn) {
       if (ev->key.keysym.scancode==wavePreviewKey) {

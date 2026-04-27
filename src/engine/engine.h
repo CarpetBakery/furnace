@@ -600,6 +600,7 @@ class DivEngine {
     int tickMult;
     int lastNBIns, lastNBOuts, lastNBSize;
     std::atomic<size_t> processTime;
+    std::vector<int> transposeNotesOn;
 
     float chipPeak[DIV_MAX_CHIPS][DIV_MAX_OUTPUTS];
 

@@ -541,6 +541,19 @@ void FurnaceGUI::doTranspose(int amount, OperationMask& mask) {
           }
           if (pat->newData[j][iFine]==-1) continue;
           pat->newData[j][iFine]=MIN(top,MAX(0,pat->newData[j][iFine]+amount));
+
+          // Try to play the new note that was transposed
+          int note = pat->newData[j][iFine];
+          logV("Transpose note to %d", note);
+          if (sampleMapWaitingInput) {
+            alterSampleMap(1, note);
+          }
+          else {
+            e->synchronized([this, note]() {
+              if (!e->autoNoteOn(-1, curIns, note)) failedNoteOn = true;
+            });
+          }
+          e->transposeNotesOn.push_back(note);
         }
         j=0;
       }
