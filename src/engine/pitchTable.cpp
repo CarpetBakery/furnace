@@ -18,6 +18,55 @@
  */
 
 #include "dispatch.h"
+#include "engine.h"
+
+// DivPitchTableManager
+
+DivPitchTable* DivPitchTableManager::get(int sample) {
+  if (e==NULL) return NULL;
+  if (!samplePitchTable) return &defaultPitchTable;
+  if (sample<0 || sample>=(int)e->song.sample.size()) return &defaultPitchTable;
+  return &samplePitchTable[sample];
+}
+
+size_t DivPitchTableManager::eSongSampleSize() {
+  if (!e) return 0;
+  return e->song.sample.size();
+}
+
+void DivPitchTableManager::updateSub(float tuning, double clock, double divider, int maximum, bool period, bool linear, int sample) {
+  // should we recalculate the tables for all samples, or only one sample?
+  if (sample==-1) {
+    // calculate the default table
+    defaultPitchTable.init(tuning,clock,divider,maximum,period,linear);
+
+    for (size_t i=0; i<MIN(e->song.sample.size(),samplePitchTableLen); i++) {
+      DivSample* s=e->song.sample[i];
+      double off=(s->centerRate>=1)?((double)s->centerRate/e->getCenterRate()):1.0;
+      samplePitchTable[i].init(tuning,clock,divider*off,maximum,period,linear);
+    }
+  } else {
+    if (sample>=0 && sample<(int)e->song.sample.size() && sample<(int)samplePitchTableLen) {
+      DivSample* s=e->song.sample[sample];
+      double off=(s->centerRate>=1)?((double)s->centerRate/e->getCenterRate()):1.0;
+      samplePitchTable[sample].init(tuning,clock,divider*off,maximum,period,linear);
+    }
+  }
+}
+
+void DivPitchTableManager::init(DivEngine* eng) {
+  e=eng;
+}
+
+DivPitchTableManager::~DivPitchTableManager() {
+  if (samplePitchTable) {
+    delete[] samplePitchTable;
+    samplePitchTable=NULL;
+    samplePitchTableLen=0;
+  }
+}
+
+// DivPitchTable
 
 int DivPitchTable::get(int base, int pitch1, int pitch2) {
   int offset=base+pitch1+pitch2;

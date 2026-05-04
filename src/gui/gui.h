@@ -2785,6 +2785,9 @@ class FurnaceGUI {
   float xyOscIntensity;
   float xyOscThickness;
 
+  // register view
+  int regViewColumns;
+
   // spectrum and tuner
   double* tunerFFTInBuf;
   fftw_complex* tunerFFTOutBuf;
