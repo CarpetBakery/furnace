@@ -256,6 +256,11 @@ void FurnaceGUI::drawOrders() {
     nextWindow=GUI_WINDOW_NOTHING;
   }
   if (!ordersOpen) return;
+
+  // Sorry for malloc :(
+  const int isUsedSize = DIV_MAX_PATTERNS * e->getTotalChannelCount();
+  unsigned char *isUsed = new unsigned char[isUsedSize];
+
   if (mobileUI) {
     patWindowPos=(portrait?ImVec2(0.0f,(mobileMenuPos*-0.65*canvasH)):ImVec2((0.16*canvasH)+0.5*canvasW*mobileMenuPos,0.0f));
     patWindowSize=(portrait?ImVec2(canvasW,canvasH-(0.16*canvasW)-(pianoOpen?(0.4*canvasW):0.0f)):ImVec2(canvasW-(0.16*canvasH),canvasH-(pianoOpen?(0.3*canvasH):0.0f)));
@@ -323,6 +328,16 @@ void FurnaceGUI::drawOrders() {
           ImGui::TableNextColumn();
           ImGui::TextNoHashHide("%s",e->getChannelShortName(i));
         }
+
+        // Figure out which patterns are used (just copied from patManager.cpp)
+        memset(isUsed, 0, isUsedSize);
+        for (int i = 0; i < e->getTotalChannelCount(); i++) {
+          for (int j = 0; j < e->curSubSong->ordersLen; j++) {
+            int index = i * DIV_MAX_PATTERNS + (e->curSubSong->orders.ord[i][j]);
+            isUsed[index]++;
+          }
+        }
+
         // OH MY FREAKING. just let me sleep.
         clipBegin.y+=lineHeight;
         ImGui::PopStyleColor();
@@ -371,7 +386,15 @@ void FurnaceGUI::drawOrders() {
               snprintf(selID,4096,"%.2X##O_%.2x_%.2x",e->curOrders->ord[j][i],j,i);
             //}
 
-            ImGui::PushStyleColor(ImGuiCol_Text,(curOrder==i || e->curOrders->ord[j][i]==e->curOrders->ord[j][curOrder])?uiColors[GUI_COLOR_ORDER_SIMILAR]:uiColors[GUI_COLOR_ORDER_INACTIVE]);
+            // choose color that the pattern is drawn in
+            if (isUsed[j * DIV_MAX_PATTERNS + e->curOrders->ord[j][i]] <= 1) {
+              ImGui::PushStyleColor(ImGuiCol_Text, uiColors[GUI_COLOR_ORDER_UNIQUE]);
+            } else if (curOrder == i || e->curOrders->ord[j][i] == e->curOrders->ord[j][curOrder]) {
+              ImGui::PushStyleColor(ImGuiCol_Text, uiColors[GUI_COLOR_ORDER_SIMILAR]);
+            }else {
+              ImGui::PushStyleColor(ImGuiCol_Text, uiColors[GUI_COLOR_ORDER_INACTIVE]);
+            }
+
             if (ImGui::Selectable(selID,settings.ordersCursor?(cursor.xCoarse==j && curOrder!=i):false)) {
               if (curOrder==i) {
                 if (orderEditMode==0) {
@@ -462,4 +485,6 @@ void FurnaceGUI::drawOrders() {
   }
   if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) curWindow=GUI_WINDOW_ORDERS;
   ImGui::End();
+
+  delete[] isUsed;
 }

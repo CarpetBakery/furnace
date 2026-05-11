@@ -483,6 +483,19 @@ void FurnaceGUI::doTranspose(int amount, OperationMask& mask) {
             }
             pat->data[j][0]=origNote;
             pat->data[j][1]=(unsigned char)origOctave;
+
+            // Try to play the new note that was transposed
+            int note = origNote + (origOctave * 12);
+            logV("Transpose note to %d", note);
+            if (sampleMapWaitingInput) {
+              alterSampleMap(1, note);
+            }
+            else {
+              e->synchronized([this, note]() {
+                if (!e->autoNoteOn(-1, curIns, note)) failedNoteOn = true;
+                });
+            }
+            e->transposeNotesOn.push_back(note);
           }
         } else {
           int top=255;

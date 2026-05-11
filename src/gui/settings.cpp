@@ -4119,6 +4119,7 @@ void FurnaceGUI::drawSettings() {
           UI_COLOR_CONFIG(GUI_COLOR_ORDER_SELECTED,_("Selected order"));
           UI_COLOR_CONFIG(GUI_COLOR_ORDER_SIMILAR,_("Similar patterns"));
           UI_COLOR_CONFIG(GUI_COLOR_ORDER_INACTIVE,_("Inactive patterns"));
+          UI_COLOR_CONFIG(GUI_COLOR_ORDER_UNIQUE,_("Unique patterns"));
           ImGui::TreePop();
         }
         if (ImGui::TreeNode(_("Envelope View"))) {

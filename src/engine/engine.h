@@ -693,6 +693,7 @@ class DivEngine {
     int tickMult;
     int lastNBIns, lastNBOuts, lastNBSize;
     std::atomic<size_t> processTime;
+    std::vector<int> transposeNotesOn;
 
     void runExportThread();
     void nextBuf(float** in, float** out, int inChans, int outChans, unsigned int size);
