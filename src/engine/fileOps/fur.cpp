@@ -2436,15 +2436,11 @@ SafeWriter* DivEngine::saveFur(bool notPrimary) {
   std::vector<int> wavePtr;
   std::vector<int> samplePtr;
   std::vector<int> patPtr;
-  std::vector<int> groovePtr;
   int assetDirPtr[3];
-  int compatFlagPtr=0;
-  int commentPtr=0;
-  size_t blockStartSeek, blockEndSeek;
-  size_t sng2PtrSeek=0, flagPtrSeek=0, adirPtrSeek=0, ins2PtrSeek=0, wavePtrSeek=0, smp2PtrSeek=0, patnPtrSeek=0, cflgPtrSeek=0;
-  size_t cmntPtrSeek=0, grovPtrSeek=0;
-
-  warnings="";
+  size_t ptrSeek, subSongPtrSeek, sysFlagsPtrSeek, blockStartSeek, blockEndSeek, assetDirPtrSeek;
+  size_t subSongIndex = 0;
+  DivSubSong* subSong = song.subsong[subSongIndex];
+  warnings = "";
 
   // fail if values are out of range
   /*
@@ -2459,35 +2455,35 @@ SafeWriter* DivEngine::saveFur(bool notPrimary) {
     return NULL;
   }
   */
-  if (song.ins.size()>256) {
+  if (song.ins.size() > 256) {
     logE("maximum number of instruments is 256!");
-    lastError="maximum number of instruments is 256";
+    lastError = "maximum number of instruments is 256";
     saveLock.unlock();
     return NULL;
   }
-  if (song.wave.size()>32768) {
-    logE("maximum number of wavetables is 32768!");
-    lastError="maximum number of wavetables is 32768";
+  if (song.wave.size() > 256) {
+    logE("maximum number of wavetables is 256!");
+    lastError = "maximum number of wavetables is 256";
     saveLock.unlock();
     return NULL;
   }
-  if (song.sample.size()>32768) {
-    logE("maximum number of samples is 32768!");
-    lastError="maximum number of samples is 32768";
+  if (song.sample.size() > 256) {
+    logE("maximum number of samples is 256!");
+    lastError = "maximum number of samples is 256";
     saveLock.unlock();
     return NULL;
   }
 
   if (!notPrimary) {
-    song.isDMF=false;
-    song.version=DIV_ENGINE_VERSION;
+    song.isDMF = false;
+    song.version = DIV_ENGINE_VERSION;
   }
 
-  SafeWriter* w=new SafeWriter;
+  SafeWriter* w = new SafeWriter;
   w->init();
   /// HEADER
   // write magic
-  w->write(DIV_FUR_MAGIC,16);
+  w->write(DIV_FUR_MAGIC, 16);
 
   // write version
   w->writeS(DIV_ENGINE_VERSION);
@@ -2505,426 +2501,576 @@ SafeWriter* DivEngine::saveFur(bool notPrimary) {
   // high short is channel
   // low short is pattern number
   std::vector<PatToWrite> patsToWrite;
-  if (getConfInt("saveUnusedPatterns",0)==1) {
-    for (int i=0; i<song.chans; i++) {
-      for (size_t j=0; j<song.subsong.size(); j++) {
-        DivSubSong* subs=song.subsong[j];
-        for (int k=0; k<DIV_MAX_PATTERNS; k++) {
-          if (subs->pat[i].data[k]==NULL) continue;
-          patsToWrite.push_back(PatToWrite(j,i,k));
+  if (getConfInt("saveUnusedPatterns", 0) == 1) {
+    for (int i = 0; i < song.chans; i++) {
+      for (size_t j = 0; j < song.subsong.size(); j++) {
+        DivSubSong* subs = song.subsong[j];
+        for (int k = 0; k < DIV_MAX_PATTERNS; k++) {
+          if (subs->pat[i].data[k] == NULL) continue;
+          patsToWrite.push_back(PatToWrite(j, i, k));
         }
       }
     }
-  } else {
+  }
+  else {
     bool alreadyAdded[DIV_MAX_PATTERNS];
-    for (int i=0; i<song.chans; i++) {
-      for (size_t j=0; j<song.subsong.size(); j++) {
-        DivSubSong* subs=song.subsong[j];
-        memset(alreadyAdded,0,DIV_MAX_PATTERNS*sizeof(bool));
-        for (int k=0; k<subs->ordersLen; k++) {
+    for (int i = 0; i < song.chans; i++) {
+      for (size_t j = 0; j < song.subsong.size(); j++) {
+        DivSubSong* subs = song.subsong[j];
+        memset(alreadyAdded, 0, DIV_MAX_PATTERNS * sizeof(bool));
+        for (int k = 0; k < subs->ordersLen; k++) {
           if (alreadyAdded[subs->orders.ord[i][k]]) continue;
-          patsToWrite.push_back(PatToWrite(j,i,subs->orders.ord[i][k]));
-          alreadyAdded[subs->orders.ord[i][k]]=true;
+          patsToWrite.push_back(PatToWrite(j, i, subs->orders.ord[i][k]));
+          alreadyAdded[subs->orders.ord[i][k]] = true;
         }
       }
     }
   }
 
   /// SONG INFO
-  w->write("INF2",4);
-  blockStartSeek=w->tell();
+  w->write("INFO", 4);
+  blockStartSeek = w->tell();
   w->writeI(0);
 
-  // song information
-  w->writeString(song.name,false);
-  w->writeString(song.author,false);
-  w->writeString(song.systemName,false);
-  w->writeString(song.category,false);
-  w->writeString(song.nameJ,false);
-  w->writeString(song.authorJ,false);
-  w->writeString(song.systemNameJ,false);
-  w->writeString(song.categoryJ,false);
+  w->writeC(subSong->effectDivider);
+  // these are for compatibility
+  w->writeC(subSong->speeds.val[0]);
+  w->writeC((subSong->speeds.len >= 2) ? subSong->speeds.val[1] : subSong->speeds.val[0]);
+  w->writeC(subSong->arpLen);
+  w->writeF(subSong->hz);
+  w->writeS(subSong->patLen);
+  w->writeS(subSong->ordersLen);
+  w->writeC(subSong->hilightA);
+  w->writeC(subSong->hilightB);
+  w->writeS(song.insLen);
+  w->writeS(song.waveLen);
+  w->writeS(song.sampleLen);
+  w->writeI(patsToWrite.size());
+
+  for (int i = 0; i < DIV_MAX_CHIPS; i++) {
+    if (i >= song.systemLen) {
+      w->writeC(0);
+    }
+    else {
+      w->writeC(systemToFileFur(song.system[i]));
+    }
+  }
+
+  for (int i = 0; i < DIV_MAX_CHIPS; i++) {
+    w->writeC(song.systemVol[i] * 64.0f);
+  }
+
+  for (int i = 0; i < DIV_MAX_CHIPS; i++) {
+    w->writeC(song.systemPan[i] * 127.0f);
+  }
+
+  // chip flags (we'll seek here later)
+  sysFlagsPtrSeek = w->tell();
+  for (int i = 0; i < DIV_MAX_CHIPS; i++) {
+    w->writeI(0);
+  }
+
+  // song name
+  w->writeString(song.name, false);
+  // song author
+  w->writeString(song.author, false);
+
   w->writeF(song.tuning);
-  w->writeC(song.autoSystem);
 
-  // system definition
+  // compatibility flags
+  w->writeC(song.compatFlags.limitSlides);
+  w->writeC(song.compatFlags.linearPitch);
+  w->writeC(song.compatFlags.loopModality);
+  w->writeC(song.compatFlags.properNoiseLayout);
+  w->writeC(song.compatFlags.waveDutyIsVol);
+  w->writeC(song.compatFlags.resetMacroOnPorta);
+  w->writeC(song.compatFlags.legacyVolumeSlides);
+  w->writeC(song.compatFlags.compatibleArpeggio);
+  w->writeC(song.compatFlags.noteOffResetsSlides);
+  w->writeC(song.compatFlags.targetResetsSlides);
+  w->writeC(song.compatFlags.arpNonPorta);
+  w->writeC(song.compatFlags.algMacroBehavior);
+  w->writeC(song.compatFlags.brokenShortcutSlides);
+  w->writeC(song.compatFlags.ignoreDuplicateSlides);
+  w->writeC(song.compatFlags.stopPortaOnNoteOff);
+  w->writeC(song.compatFlags.continuousVibrato);
+  w->writeC(song.compatFlags.brokenDACMode);
+  w->writeC(song.compatFlags.oneTickCut);
+  w->writeC(song.compatFlags.newInsTriggersInPorta);
+  w->writeC(song.compatFlags.arp0Reset);
+
+  ptrSeek = w->tell();
+  // instrument pointers (we'll seek here later)
+  for (int i = 0; i < song.insLen; i++) {
+    w->writeI(0);
+  }
+
+  // wavetable pointers (we'll seek here later)
+  for (int i = 0; i < song.waveLen; i++) {
+    w->writeI(0);
+  }
+
+  // sample pointers (we'll seek here later)
+  for (int i = 0; i < song.sampleLen; i++) {
+    w->writeI(0);
+  }
+
+  // pattern pointers (we'll seek here later)
+  for (size_t i = 0; i < patsToWrite.size(); i++) {
+    w->writeI(0);
+  }
+
+  for (int i = 0; i < song.chans; i++) {
+    for (int j = 0; j < subSong->ordersLen; j++) {
+      w->writeC(subSong->orders.ord[i][j]);
+    }
+  }
+
+  for (int i = 0; i < song.chans; i++) {
+    w->writeC(subSong->pat[i].effectCols);
+  }
+
+  for (int i = 0; i < song.chans; i++) {
+    w->writeC(
+      (subSong->chanShow[i] ? 1 : 0) |
+      (subSong->chanShowChanOsc[i] ? 2 : 0)
+    );
+  }
+
+  for (int i = 0; i < song.chans; i++) {
+    w->writeC(subSong->chanCollapse[i]);
+  }
+
+  for (int i = 0; i < song.chans; i++) {
+    w->writeString(subSong->chanName[i], false);
+  }
+
+  for (int i = 0; i < song.chans; i++) {
+    w->writeString(subSong->chanShortName[i], false);
+  }
+
+  w->writeString(song.notes, false);
+
   w->writeF(song.masterVol);
-  w->writeS(song.chans);
-  w->writeS(song.systemLen);
 
-  for (int i=0; i<song.systemLen; i++) {
-    w->writeS(systemToFileFur(song.system[i]));
-    w->writeS(song.systemChans[i]);
+  // extended compat flags
+  w->writeC(song.compatFlags.brokenSpeedSel);
+  w->writeC(song.compatFlags.noSlidesOnFirstTick);
+  w->writeC(song.compatFlags.rowResetsArpPos);
+  w->writeC(song.compatFlags.ignoreJumpAtEnd);
+  w->writeC(song.compatFlags.buggyPortaAfterSlide);
+  w->writeC(song.compatFlags.gbInsAffectsEnvelope);
+  w->writeC(song.compatFlags.sharedExtStat);
+  w->writeC(song.compatFlags.ignoreDACModeOutsideIntendedChannel);
+  w->writeC(song.compatFlags.e1e2AlsoTakePriority);
+  w->writeC(song.compatFlags.newSegaPCM);
+  w->writeC(song.compatFlags.fbPortaPause);
+  w->writeC(song.compatFlags.snDutyReset);
+  w->writeC(song.compatFlags.pitchMacroIsLinear);
+  w->writeC(song.compatFlags.pitchSlideSpeed);
+  w->writeC(song.compatFlags.oldOctaveBoundary);
+  w->writeC(song.compatFlags.noOPN2Vol);
+  w->writeC(song.compatFlags.newVolumeScaling);
+  w->writeC(song.compatFlags.volMacroLinger);
+  w->writeC(song.compatFlags.brokenOutVol);
+  w->writeC(song.compatFlags.e1e2StopOnSameNote);
+  w->writeC(song.compatFlags.brokenPortaArp);
+  w->writeC(song.compatFlags.snNoLowPeriods);
+  w->writeC(song.compatFlags.delayBehavior);
+  w->writeC(song.compatFlags.jumpTreatment);
+  w->writeC(song.autoSystem);
+  w->writeC(song.compatFlags.disableSampleMacro);
+  w->writeC(song.compatFlags.brokenOutVol2);
+  w->writeC(song.compatFlags.oldArpStrategy);
+
+  // first subsong virtual tempo
+  w->writeS(subSong->virtualTempoN);
+  w->writeS(subSong->virtualTempoD);
+
+  // subsong list
+  w->writeString(subSong->name, false);
+  w->writeString(subSong->notes, false);
+  w->writeC((unsigned char)(song.subsong.size() - 1));
+  w->writeC(0); // reserved
+  w->writeC(0);
+  w->writeC(0);
+  subSongPtrSeek = w->tell();
+  // subsong pointers (we'll seek here later)
+  for (size_t i = 0; i < (song.subsong.size() - 1); i++) {
+    w->writeI(0);
+  }
+
+  // additional metadata
+  w->writeString(song.systemName, false);
+  w->writeString(song.category, false);
+  w->writeString(song.nameJ, false);
+  w->writeString(song.authorJ, false);
+  w->writeString(song.systemNameJ, false);
+  w->writeString(song.categoryJ, false);
+
+  // system output config
+  for (int i = 0; i < song.systemLen; i++) {
     w->writeF(song.systemVol[i]);
     w->writeF(song.systemPan[i]);
     w->writeF(song.systemPanFR[i]);
   }
-
-  // patchbay
   w->writeI(song.patchbay.size());
-  for (unsigned int i: song.patchbay) {
+  for (unsigned int i : song.patchbay) {
     w->writeI(i);
   }
   w->writeC(song.patchbayAuto);
 
-  /// song elements
-  // sub-songs
-  if (!song.subsong.empty()) {
-    w->writeC(0x01);
-    w->writeI(song.subsong.size());
-    sng2PtrSeek=w->tell();
-    for (size_t i=0; i<song.subsong.size(); i++) {
-      w->writeI(0);
-    }
-  }
-  // chip flags
-  if (true) {
-    w->writeC(0x02);
-    w->writeI(song.systemLen);
-    flagPtrSeek=w->tell();
-    for (int i=0; i<song.systemLen; i++) {
-      w->writeI(0);
-    }
-  }
-  // asset directories
-  if (true) {
-    w->writeC(0x03);
-    w->writeI(3);
-    adirPtrSeek=w->tell();
-    w->writeI(0);
-    w->writeI(0);
-    w->writeI(0);
-  }
-  // instruments
-  if (!song.ins.empty()) {
-    w->writeC(0x04);
-    w->writeI(song.ins.size());
-    ins2PtrSeek=w->tell();
-    for (size_t i=0; i<song.ins.size(); i++) {
-      w->writeI(0);
-    }
-  }
-  // wavetables
-  if (!song.wave.empty()) {
-    w->writeC(0x05);
-    w->writeI(song.wave.size());
-    wavePtrSeek=w->tell();
-    for (size_t i=0; i<song.wave.size(); i++) {
-      w->writeI(0);
-    }
-  }
-  // samples
-  if (!song.sample.empty()) {
-    w->writeC(0x06);
-    w->writeI(song.sample.size());
-    smp2PtrSeek=w->tell();
-    for (size_t i=0; i<song.sample.size(); i++) {
-      w->writeI(0);
-    }
-  }
-  // patterns
-  if (!patsToWrite.empty()) {
-    w->writeC(0x07);
-    w->writeI(patsToWrite.size());
-    patnPtrSeek=w->tell();
-    for (size_t i=0; i<patsToWrite.size(); i++) {
-      w->writeI(0);
-    }
-  }
-  // compat flags
-  if (!song.compatFlags.areDefaults()) {
-    w->writeC(0x08);
-    w->writeI(1);
-    cflgPtrSeek=w->tell();
-    w->writeI(0);
-  }
-  // song comments
-  if (!song.notes.empty()) {
-    w->writeC(0x09);
-    w->writeI(1);
-    cmntPtrSeek=w->tell();
-    w->writeI(0);
-  }
-  // groove patterns
-  if (!song.grooves.empty()) {
-    w->writeC(0x0a);
-    w->writeI(song.grooves.size());
-    grovPtrSeek=w->tell();
-    for (size_t i=0; i<song.grooves.size(); i++) {
-      w->writeI(0);
-    }
-  }
-  
-  w->writeC(0);
+  // even more compat flags
+  w->writeC(song.compatFlags.brokenPortaLegato);
+  w->writeC(song.compatFlags.brokenFMOff);
+  w->writeC(song.compatFlags.preNoteNoEffect);
+  w->writeC(song.compatFlags.oldDPCM);
+  w->writeC(song.compatFlags.resetArpPhaseOnNewNote);
+  w->writeC(song.compatFlags.ceilVolumeScaling);
+  w->writeC(song.compatFlags.oldAlwaysSetVolume);
+  w->writeC(song.compatFlags.oldSampleOffset);
 
-  blockEndSeek=w->tell();
-  w->seek(blockStartSeek,SEEK_SET);
-  w->writeI(blockEndSeek-blockStartSeek-4);
-  w->seek(0,SEEK_END);
+  // speeds of first song
+  w->writeC(subSong->speeds.len);
+  for (int i = 0; i < 16; i++) {
+    w->writeC(subSong->speeds.val[i]);
+  }
+
+  // groove list
+  w->writeC((unsigned char)song.grooves.size());
+  for (const DivGroovePattern& i : song.grooves) {
+    w->writeC(i.len);
+    for (int j = 0; j < 16; j++) {
+      w->writeC(i.val[j]);
+    }
+  }
+
+  // asset dir pointers (we'll seek here later)
+  assetDirPtrSeek = w->tell();
+  w->writeI(0);
+  w->writeI(0);
+  w->writeI(0);
+
+  blockEndSeek = w->tell();
+  w->seek(blockStartSeek, SEEK_SET);
+  w->writeI(blockEndSeek - blockStartSeek - 4);
+  w->seek(0, SEEK_END);
 
   /// SUBSONGS
-  subSongPtr.reserve(song.subsong.size());
-  for (size_t i=0; i<song.subsong.size(); i++) {
+  subSongPtr.reserve(song.subsong.size() - 1);
+  for (subSongIndex = 1; subSongIndex < song.subsong.size(); subSongIndex++) {
+    subSong = song.subsong[subSongIndex];
     subSongPtr.push_back(w->tell());
-    song.subsong[i]->putData(w,song.chans);
+    w->write("SONG", 4);
+    blockStartSeek = w->tell();
+    w->writeI(0);
+
+    w->writeC(subSong->effectDivider);
+    w->writeC(subSong->speeds.val[0]);
+    w->writeC((subSong->speeds.len >= 2) ? subSong->speeds.val[1] : subSong->speeds.val[0]);
+    w->writeC(subSong->arpLen);
+    w->writeF(subSong->hz);
+    w->writeS(subSong->patLen);
+    w->writeS(subSong->ordersLen);
+    w->writeC(subSong->hilightA);
+    w->writeC(subSong->hilightB);
+    w->writeS(subSong->virtualTempoN);
+    w->writeS(subSong->virtualTempoD);
+
+    w->writeString(subSong->name, false);
+    w->writeString(subSong->notes, false);
+
+    for (int i = 0; i < song.chans; i++) {
+      for (int j = 0; j < subSong->ordersLen; j++) {
+        w->writeC(subSong->orders.ord[i][j]);
+      }
+    }
+
+    for (int i = 0; i < song.chans; i++) {
+      w->writeC(subSong->pat[i].effectCols);
+    }
+
+    for (int i = 0; i < song.chans; i++) {
+      w->writeC(
+        (subSong->chanShow[i] ? 1 : 0) |
+        (subSong->chanShowChanOsc[i] ? 2 : 0)
+      );
+    }
+
+    for (int i = 0; i < song.chans; i++) {
+      w->writeC(subSong->chanCollapse[i]);
+    }
+
+    for (int i = 0; i < song.chans; i++) {
+      w->writeString(subSong->chanName[i], false);
+    }
+
+    for (int i = 0; i < song.chans; i++) {
+      w->writeString(subSong->chanShortName[i], false);
+    }
+
+    // speeds
+    w->writeC(subSong->speeds.len);
+    for (int i = 0; i < 16; i++) {
+      w->writeC(subSong->speeds.val[i]);
+    }
+
+    blockEndSeek = w->tell();
+    w->seek(blockStartSeek, SEEK_SET);
+    w->writeI(blockEndSeek - blockStartSeek - 4);
+    w->seek(0, SEEK_END);
   }
 
   /// CHIP FLAGS
   sysFlagsPtr.reserve(song.systemLen);
-  for (int i=0; i<song.systemLen; i++) {
-    String data=song.systemFlags[i].toString();
+  for (int i = 0; i < song.systemLen; i++) {
+    String data = song.systemFlags[i].toString();
     if (data.empty()) {
       sysFlagsPtr.push_back(0);
       continue;
     }
 
     sysFlagsPtr.push_back(w->tell());
-    w->write("FLAG",4);
-    blockStartSeek=w->tell();
+    w->write("FLAG", 4);
+    blockStartSeek = w->tell();
     w->writeI(0);
 
-    w->writeString(data,false);
+    w->writeString(data, false);
 
-    blockEndSeek=w->tell();
-    w->seek(blockStartSeek,SEEK_SET);
-    w->writeI(blockEndSeek-blockStartSeek-4);
-    w->seek(0,SEEK_END);
-  }
-
-  /// COMPAT FLAGS
-  if (!song.compatFlags.areDefaults()) {
-    compatFlagPtr=w->tell();
-    song.compatFlags.putData(w);
-  }
-
-  /// SONG COMMENTS
-  if (!song.notes.empty()) {
-    commentPtr=w->tell();
-    w->write("CMNT",4);
-    blockStartSeek=w->tell();
-    w->writeI(0);
-
-    w->writeString(song.notes,false);
-
-    blockEndSeek=w->tell();
-    w->seek(blockStartSeek,SEEK_SET);
-    w->writeI(blockEndSeek-blockStartSeek-4);
-    w->seek(0,SEEK_END);
+    blockEndSeek = w->tell();
+    w->seek(blockStartSeek, SEEK_SET);
+    w->writeI(blockEndSeek - blockStartSeek - 4);
+    w->seek(0, SEEK_END);
   }
 
   /// ASSET DIRECTORIES
-  assetDirPtr[0]=w->tell();
-  putAssetDirData(w,song.insDir);
-  assetDirPtr[1]=w->tell();
-  putAssetDirData(w,song.waveDir);
-  assetDirPtr[2]=w->tell();
-  putAssetDirData(w,song.sampleDir);
-
-  /// GROOVES
-  for (DivGroovePattern& i: song.grooves) {
-    groovePtr.push_back(w->tell());
-    i.putData(w);
-  }
+  assetDirPtr[0] = w->tell();
+  putAssetDirData(w, song.insDir);
+  assetDirPtr[1] = w->tell();
+  putAssetDirData(w, song.waveDir);
+  assetDirPtr[2] = w->tell();
+  putAssetDirData(w, song.sampleDir);
 
   /// INSTRUMENT
   insPtr.reserve(song.insLen);
-  for (int i=0; i<song.insLen; i++) {
-    DivInstrument* ins=song.ins[i];
+  for (int i = 0; i < song.insLen; i++) {
+    DivInstrument* ins = song.ins[i];
     insPtr.push_back(w->tell());
-    ins->putInsData2(w,false);
+    ins->putInsData2(w, false);
   }
 
   /// WAVETABLE
   wavePtr.reserve(song.waveLen);
-  for (int i=0; i<song.waveLen; i++) {
-    DivWavetable* wave=song.wave[i];
+  for (int i = 0; i < song.waveLen; i++) {
+    DivWavetable* wave = song.wave[i];
     wavePtr.push_back(w->tell());
     wave->putWaveData(w);
   }
 
   /// SAMPLE
   samplePtr.reserve(song.sampleLen);
-  for (int i=0; i<song.sampleLen; i++) {
-    DivSample* sample=song.sample[i];
+  for (int i = 0; i < song.sampleLen; i++) {
+    DivSample* sample = song.sample[i];
     samplePtr.push_back(w->tell());
     sample->putSampleData(w);
   }
 
   /// PATTERN
+  bool newPatternFormat = true;
   patPtr.reserve(patsToWrite.size());
-  for (PatToWrite& i: patsToWrite) {
-    DivPattern* pat=song.subsong[i.subsong]->pat[i.chan].getPattern(i.pat,false);
+  for (PatToWrite& i : patsToWrite) {
+    DivPattern* pat = song.subsong[i.subsong]->pat[i.chan].getPattern(i.pat, false);
     patPtr.push_back(w->tell());
 
-    w->write("PATN",4);
-    blockStartSeek=w->tell();
-    w->writeI(0);
+    if (newPatternFormat) {
+      w->write("PATN", 4);
+      blockStartSeek = w->tell();
+      w->writeI(0);
 
-    w->writeC(i.subsong);
-    w->writeC(i.chan);
-    w->writeS(i.pat);
-    w->writeString(pat->name,false);
+      w->writeC(i.subsong);
+      w->writeC(i.chan);
+      w->writeS(i.pat);
+      w->writeString(pat->name, false);
 
-    unsigned char emptyRows=0;
+      unsigned char emptyRows = 0;
 
-    for (int j=0; j<song.subsong[i.subsong]->patLen; j++) {
-      unsigned char mask=0;
-      unsigned char finalNote=255;
-      unsigned short effectMask=0;
+      for (int j = 0; j < song.subsong[i.subsong]->patLen; j++) {
+        unsigned char mask = 0;
+        unsigned char finalNote = 255;
+        unsigned short effectMask = 0;
 
-      if (pat->newData[j][DIV_PAT_NOTE]==DIV_NOTE_OFF) { // note off
-        finalNote=180;
-      } else if (pat->newData[j][DIV_PAT_NOTE]==DIV_NOTE_REL) { // note release
-        finalNote=181;
-      } else if (pat->newData[j][DIV_PAT_NOTE]==DIV_MACRO_REL) { // macro release
-        finalNote=182;
-      } else if (pat->newData[j][DIV_PAT_NOTE]==-1) { // empty
-        finalNote=255;
-      } else {
-        finalNote=pat->newData[j][DIV_PAT_NOTE];
+        if (pat->newData[j][DIV_PAT_NOTE] == DIV_NOTE_OFF) {
+          finalNote = 180;
+        }
+        else if (pat->newData[j][DIV_PAT_NOTE] == DIV_NOTE_REL) { // note release
+          finalNote = 181;
+        }
+        else if (pat->newData[j][DIV_PAT_NOTE] == DIV_MACRO_REL) { // macro release
+          finalNote = 182;
+        }
+        else if (pat->newData[j][DIV_PAT_NOTE] == -1) { // empty
+          finalNote = 255;
+        }
+        else {
+          finalNote = pat->newData[j][DIV_PAT_NOTE];
+        }
+
+
+        // idk what this is
+        /*else {
+          int seek = (pat->newData[j][0] + (signed char)pat->newData[j][1] * 12) + 60;
+          if (seek < 0 || seek >= 180) {
+            finalNote = 255;
+          }
+          else {
+            finalNote = seek;
+          }
+        }*/
+
+        if (finalNote != 255) mask |= 1; // note
+        if (pat->newData[j][2] != -1) mask |= 2; // instrument
+        if (pat->newData[j][3] != -1) mask |= 4; // volume
+        for (int k = 0; k < song.subsong[i.subsong]->pat[i.chan].effectCols * 2; k += 2) {
+          if (k == 0) {
+            if (pat->newData[j][4 + k] != -1) mask |= 8;
+            if (pat->newData[j][5 + k] != -1) mask |= 16;
+          }
+          else if (k < 8) {
+            if (pat->newData[j][4 + k] != -1 || pat->newData[j][5 + k] != -1) mask |= 32;
+          }
+          else {
+            if (pat->newData[j][4 + k] != -1 || pat->newData[j][5 + k] != -1) mask |= 64;
+          }
+
+          if (pat->newData[j][4 + k] != -1) effectMask |= (1 << k);
+          if (pat->newData[j][5 + k] != -1) effectMask |= (2 << k);
+        }
+
+        if (mask == 0) {
+          emptyRows++;
+          if (emptyRows > 127) {
+            w->writeC(128 | (emptyRows - 2));
+            emptyRows = 0;
+          }
+        }
+        else {
+          if (emptyRows > 1) {
+            w->writeC(128 | (emptyRows - 2));
+            emptyRows = 0;
+          }
+          else if (emptyRows) {
+            w->writeC(0);
+            emptyRows = 0;
+          }
+
+          w->writeC(mask);
+
+          if (mask & 32) w->writeC(effectMask & 0xff);
+          if (mask & 64) w->writeC((effectMask >> 8) & 0xff);
+
+          if (mask & 1) w->writeC(finalNote);
+          if (mask & 2) w->writeC(pat->newData[j][2]);
+          if (mask & 4) w->writeC(pat->newData[j][3]);
+          if (mask & 8) w->writeC(pat->newData[j][4]);
+          if (mask & 16) w->writeC(pat->newData[j][5]);
+          if (mask & 32) {
+            if (effectMask & 4) w->writeC(pat->newData[j][6]);
+            if (effectMask & 8) w->writeC(pat->newData[j][7]);
+            if (effectMask & 16) w->writeC(pat->newData[j][8]);
+            if (effectMask & 32) w->writeC(pat->newData[j][9]);
+            if (effectMask & 64) w->writeC(pat->newData[j][10]);
+            if (effectMask & 128) w->writeC(pat->newData[j][11]);
+          }
+          if (mask & 64) {
+            if (effectMask & 256) w->writeC(pat->newData[j][12]);
+            if (effectMask & 512) w->writeC(pat->newData[j][13]);
+            if (effectMask & 1024) w->writeC(pat->newData[j][14]);
+            if (effectMask & 2048) w->writeC(pat->newData[j][15]);
+            if (effectMask & 4096) w->writeC(pat->newData[j][16]);
+            if (effectMask & 8192) w->writeC(pat->newData[j][17]);
+            if (effectMask & 16384) w->writeC(pat->newData[j][18]);
+            if (effectMask & 32768) w->writeC(pat->newData[j][19]);
+          }
+        }
       }
 
-      if (finalNote!=255) mask|=1; // note
-      if (pat->newData[j][DIV_PAT_INS]!=-1) mask|=2; // instrument
-      if (pat->newData[j][DIV_PAT_VOL]!=-1) mask|=4; // volume
-      for (int k=0; k<song.subsong[i.subsong]->pat[i.chan].effectCols*2; k+=2) {
-        if (k==0) {
-          if (pat->newData[j][DIV_PAT_FX(0)+k]!=-1) mask|=8;
-          if (pat->newData[j][DIV_PAT_FXVAL(0)+k]!=-1) mask|=16;
-        } else if (k<8) {
-          if (pat->newData[j][DIV_PAT_FX(0)+k]!=-1 || pat->newData[j][DIV_PAT_FXVAL(0)+k]!=-1) mask|=32;
-        } else {
-          if (pat->newData[j][DIV_PAT_FX(0)+k]!=-1 || pat->newData[j][DIV_PAT_FXVAL(0)+k]!=-1) mask|=64;
-        }
+      // stop
+      w->writeC(0xff);
+    }
+    else {
+      w->write("PATR", 4);
+      blockStartSeek = w->tell();
+      w->writeI(0);
 
-        if (pat->newData[j][DIV_PAT_FX(0)+k]!=-1) effectMask|=(1<<k);
-        if (pat->newData[j][DIV_PAT_FXVAL(0)+k]!=-1) effectMask|=(2<<k);
+      w->writeS(i.chan);
+      w->writeS(i.pat);
+      w->writeS(i.subsong);
+
+      w->writeS(0); // reserved
+
+      for (int j = 0; j < song.subsong[i.subsong]->patLen; j++) {
+        w->writeS(pat->newData[j][0]); // note
+        w->writeS(pat->newData[j][1]); // octave
+        w->writeS(pat->newData[j][2]); // instrument
+        w->writeS(pat->newData[j][3]); // volume
+#ifdef TA_BIG_ENDIAN
+        for (int k = 0; k < song.subsong[i.subsong]->pat[i.chan].effectCols * 2; k++) {
+          w->writeS(pat->newData[j][4 + k]);
+        }
+#else
+        w->write(&pat->newData[j][4], 2 * song.subsong[i.subsong]->pat[i.chan].effectCols * 2); // effects
+#endif
       }
 
-      if (mask==0) {
-        emptyRows++;
-        if (emptyRows>127) {
-          w->writeC(128|(emptyRows-2));
-          emptyRows=0;
-        }
-      } else {
-        if (emptyRows>1) {
-          w->writeC(128|(emptyRows-2));
-          emptyRows=0;
-        } else if (emptyRows) {
-          w->writeC(0);
-          emptyRows=0;
-        }
-
-        w->writeC(mask);
-
-        if (mask&32) w->writeC(effectMask&0xff);
-        if (mask&64) w->writeC((effectMask>>8)&0xff);
-
-        if (mask&1) w->writeC(finalNote);
-        if (mask&2) w->writeC(pat->newData[j][DIV_PAT_INS]);
-        if (mask&4) w->writeC(pat->newData[j][DIV_PAT_VOL]);
-        if (mask&8) w->writeC(pat->newData[j][DIV_PAT_FX(0)]);
-        if (mask&16) w->writeC(pat->newData[j][DIV_PAT_FXVAL(0)]);
-        if (mask&32) {
-          if (effectMask&4) w->writeC(pat->newData[j][DIV_PAT_FX(1)]);
-          if (effectMask&8) w->writeC(pat->newData[j][DIV_PAT_FXVAL(1)]);
-          if (effectMask&16) w->writeC(pat->newData[j][DIV_PAT_FX(2)]);
-          if (effectMask&32) w->writeC(pat->newData[j][DIV_PAT_FXVAL(2)]);
-          if (effectMask&64) w->writeC(pat->newData[j][DIV_PAT_FX(3)]);
-          if (effectMask&128) w->writeC(pat->newData[j][DIV_PAT_FXVAL(3)]);
-        }
-        if (mask&64) {
-          if (effectMask&256) w->writeC(pat->newData[j][DIV_PAT_FX(4)]);
-          if (effectMask&512) w->writeC(pat->newData[j][DIV_PAT_FXVAL(4)]);
-          if (effectMask&1024) w->writeC(pat->newData[j][DIV_PAT_FX(5)]);
-          if (effectMask&2048) w->writeC(pat->newData[j][DIV_PAT_FXVAL(5)]);
-          if (effectMask&4096) w->writeC(pat->newData[j][DIV_PAT_FX(6)]);
-          if (effectMask&8192) w->writeC(pat->newData[j][DIV_PAT_FXVAL(6)]);
-          if (effectMask&16384) w->writeC(pat->newData[j][DIV_PAT_FX(7)]);
-          if (effectMask&32768) w->writeC(pat->newData[j][DIV_PAT_FXVAL(7)]);
-        }
-      }
+      w->writeString(pat->name, false);
     }
 
-    // stop
-    w->writeC(0xff);
-
-    blockEndSeek=w->tell();
-    w->seek(blockStartSeek,SEEK_SET);
-    w->writeI(blockEndSeek-blockStartSeek-4);
-    w->seek(0,SEEK_END);
+    blockEndSeek = w->tell();
+    w->seek(blockStartSeek, SEEK_SET);
+    w->writeI(blockEndSeek - blockStartSeek - 4);
+    w->seek(0, SEEK_END);
   }
 
   /// POINTERS
-  // sub-songs
-  if (sng2PtrSeek) {
-    w->seek(sng2PtrSeek,SEEK_SET);
-    for (size_t i=0; i<song.subsong.size(); i++) {
-      w->writeI(subSongPtr[i]);
-    }
+  w->seek(ptrSeek, SEEK_SET);
+
+  for (int i = 0; i < song.insLen; i++) {
+    w->writeI(insPtr[i]);
   }
-  // chip flags
-  if (flagPtrSeek) {
-    w->seek(flagPtrSeek,SEEK_SET);
-    for (int i=0; i<song.systemLen; i++) {
-      w->writeI(sysFlagsPtr[i]);
-    }
+
+  // wavetable pointers
+  for (int i = 0; i < song.waveLen; i++) {
+    w->writeI(wavePtr[i]);
   }
-  // asset directories
-  if (adirPtrSeek) {
-    w->seek(adirPtrSeek,SEEK_SET);
-    w->writeI(assetDirPtr[0]);
-    w->writeI(assetDirPtr[1]);
-    w->writeI(assetDirPtr[2]);
+
+  // sample pointers
+  for (int i = 0; i < song.sampleLen; i++) {
+    w->writeI(samplePtr[i]);
   }
-  // instruments
-  if (ins2PtrSeek) {
-    w->seek(ins2PtrSeek,SEEK_SET);
-    for (int i: insPtr) {
-      w->writeI(i);
-    }
+
+  // pattern pointers
+  for (int i : patPtr) {
+    w->writeI(i);
   }
-  // wavetables
-  if (wavePtrSeek) {
-    w->seek(wavePtrSeek,SEEK_SET);
-    for (int i: wavePtr) {
-      w->writeI(i);
-    }
+
+  // subsong pointers
+  w->seek(subSongPtrSeek, SEEK_SET);
+  for (size_t i = 0; i < (song.subsong.size() - 1); i++) {
+    w->writeI(subSongPtr[i]);
   }
-  // samples
-  if (smp2PtrSeek) {
-    w->seek(smp2PtrSeek,SEEK_SET);
-    for (int i: samplePtr) {
-      w->writeI(i);
-    }
+
+  // flag pointers
+  w->seek(sysFlagsPtrSeek, SEEK_SET);
+  for (size_t i = 0; i < sysFlagsPtr.size(); i++) {
+    w->writeI(sysFlagsPtr[i]);
   }
-  // patterns
-  if (patnPtrSeek) {
-    w->seek(patnPtrSeek,SEEK_SET);
-    for (int i: patPtr) {
-      w->writeI(i);
-    }
-  }
-  // compat flags
-  if (cflgPtrSeek) {
-    w->seek(cflgPtrSeek,SEEK_SET);
-    w->writeI(compatFlagPtr);
-  }
-  // song comments
-  if (cmntPtrSeek) {
-    w->seek(cmntPtrSeek,SEEK_SET);
-    w->writeI(commentPtr);
-  }
-  // groove patterns
-  if (grovPtrSeek) {
-    w->seek(grovPtrSeek,SEEK_SET);
-    for (int i: groovePtr) {
-      w->writeI(i);
-    }
+
+  // asset dir pointers
+  w->seek(assetDirPtrSeek, SEEK_SET);
+  for (size_t i = 0; i < 3; i++) {
+    w->writeI(assetDirPtr[i]);
   }
 
   saveLock.unlock();
   return w;
 }
-

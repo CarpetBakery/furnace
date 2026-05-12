@@ -4720,7 +4720,7 @@ void FurnaceGUI::drawSettings() {
 
         END_SECTION;
       }
-      if (nonLatchNibble) {
+      if (true) {
         // ok, so you decided to read the code.
         // these are the cheat codes:
         // "Debug" - toggles mobile UI
