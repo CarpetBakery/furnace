@@ -1298,8 +1298,9 @@ void DivInstrument::writeFeatureSM(SafeWriter* w) {
   w->writeC(amiga.waveLen);
 
   if (amiga.useNoteMap) {
-    for (int note=0; note<180; note++) {
-      w->writeS(amiga.noteMap[note].freq);
+    // Account for older version not having "negative" notes
+    for (int note=60; note<180; note++) {
+      w->writeS(amiga.noteMap[note].freq - 60);
       w->writeS(amiga.noteMap[note].map);
     }
   }

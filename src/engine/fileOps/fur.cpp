@@ -2579,7 +2579,8 @@ SafeWriter* DivEngine::saveFur(bool notPrimary) {
 
   // compatibility flags
   w->writeC(song.compatFlags.limitSlides);
-  w->writeC(song.compatFlags.linearPitch);
+  //w->writeC(song.compatFlags.linearPitch);
+  w->writeC(2); // To fix portamento/vibrato issues in older versions of furnace
   w->writeC(song.compatFlags.loopModality);
   w->writeC(song.compatFlags.properNoiseLayout);
   w->writeC(song.compatFlags.waveDutyIsVol);
@@ -2984,9 +2985,9 @@ SafeWriter* DivEngine::saveFur(bool notPrimary) {
         }
       }
 
+    }
       // stop
       w->writeC(0xff);
-    }
 
     blockEndSeek = w->tell();
     w->seek(blockStartSeek, SEEK_SET);
